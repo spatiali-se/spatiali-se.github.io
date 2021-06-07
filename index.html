@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<!-- This whole line is an HTML comment. ### // this is a single line JS comment. ### /* This is a multiline JS comment or CSS comment (no distinction) */ -->
+<html>
+<!-- Start of head-->
+
+<head>
+  <!-- Set title and encoding -->
+  <title>EXTR:ACT Map [Test]</title>
+  <meta charset='utf-8' />
+  <!--------------------------------- Imports -------------------------------->
+  <!-- Load Leaflet CSS stylesheet remotely via CDN-->
+  <link rel='stylesheet' href='https://unpkg.com/leaflet@1.7.1/dist/leaflet.css'
+    integrity='sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=='
+    crossorigin=''/>
+  <!-- Load Leaflet.js library remotely via CDN-->
+  <script src='https://unpkg.com/leaflet@1.7.1/dist/leaflet.js'
+    integrity='sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=='
+    crossorigin=''></script>
+  <!-- Load Proj4.js library remotely via CDN-->
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.6.3/proj4.min.js'></script>
+  <!-- Load Proj4leaflet library remotely via CDN-->
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js'></script>
+  <!-- Load leaflet-ajax library-->
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/leaflet-ajax/2.1.0/leaflet.ajax.min.js'
+    integrity='sha512-Abr21JO2YqcJ03XGZRPuZSWKBhJpUAR6+2wH5zBeO4wAw4oksr8PRdF+BKIRsxvCdq+Mv4670rZ+dLnIyabbGw=='
+    crossorigin='anonymous' referrerpolicy='no-referrer'></script>
+  <!-- Load jQuery.js library remotely via CDN-->
+  <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js'></script>
+  <!-- Load PapaParse to handle CSV files -->
+  <script src='https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js'></script>
+  <!-- Load jQuery UI stylesheet via CDN -->
+  <link rel='stylesheet' href='https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css'/>
+  <!-- Load jQuery UI library via CDN-->
+  <script src='https://code.jquery.com/ui/1.12.1/jquery-ui.js'></script>
+  <!-- Load europe.js -->
+  <script src='./europe.js'></script>
+  <!--------------------------------- Styles --------------------------------->
+  <style type='text/css'>
+    /* Set the background color for the Leaflet map with CSS */
+    .leaflet-container {
+      background-color: lightblue;
+    }
+  </style>
+
+  <style>
+    /* Set style for autocomplete */
+    #autocomplete {
+      width: 300px;
+      z-index: 100;
+      margin-bottom: 5px;
+    }
+
+    /* Set style for map */
+    #map {
+      width: 1600x;
+      height: 700px;
+      border: 1px solid black;
+      z-index: 0;
+      margin-bottom: 20px;
+    }
+
+    /* Set style for debugger */
+    #debugger {
+      width: 1600x;
+      height: 40x;
+      border: 1px solid black;
+    }
+  </style>
+</head>
+
+<!--------------------------------- Definitions ---------------------------->
+<script type='text/javascript'>
+  // Add proj4 defs here to use shorthands later
+  proj4.defs([
+    [
+      'EPSG:4326',
+      '+title=WGS 84 (long/lat) +proj=longlat +ellps=WGS84 +datum=WGS84 +units=degrees'
+    ],
+    [
+      'EPSG:3857',
+      '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs'
+    ],
+    [
+      'EPSG:3035',
+      '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
+    ]
+  ]);
+
+  // Add custom leaflet icons here
+  const recycleIcon = L.icon({
+    iconUrl: './img/leaflet_icon/recycle-icon4.svg',
+    //shadowUrl: 'leaf-shadow.png',
+    iconSize:     [30, 30], // size of the icon
+    // shadowSize:   [50, 64], // size of the shadow
+    iconAnchor:   [15, 15], // point of the icon which will correspond to marker's location
+    // shadowAnchor: [4, 62],  // the same for the shadow
+    popupAnchor:  [0, -5] // point from which the popup should open relative to the iconAnchor
+  });
+</script>
+
+<!-- Start of body -->
+<body>
+
+  <!-- Create div with UI widget for autocomplete search, inherits style from #autocomplete-->
+  <div class='ui-widget' style='text-align:left;'>
+    <input id='autocomplete' placeholder='Search for: Country/Processing Plant'>
+  </div>
+
+  <!-- Create div with map, inherits style from #map -->
+  <div id='map'></div>
+
+  <!-- Here we load the data, add it to the map and style it-->
+  <script type='text/javascript'>
+  var mapboxUrl = 'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}'
+  var mapboxAttribution = 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>'
+  var mapboxToken = 'pk.eyJ1IjoicHBpb250IiwiYSI6ImNraWYxMXF0dDE4emEycXBlNTQ3eDdoa3oifQ.dMWB1DxSILN7-4qF58TX6Q'
+  
+  var none = L.tileLayer('', {
+    maxZoom: 18,
+    tileSize: 512,
+    zoomOffset: -1
+  });
+
+  var colors = L.tileLayer(mapboxUrl, {
+    attribution: mapboxAttribution,
+    maxZoom: 18,
+    id: 'mapbox/streets-v11',
+    tileSize: 512,
+    zoomOffset: -1,
+    accessToken: mapboxToken
+  });
+  
+  var grayscale = L.tileLayer(mapboxUrl, {
+    attribution: mapboxAttribution,
+    maxZoom: 18,
+    id: 'mapbox/light-v10',
+    tileSize: 512,
+    zoomOffset: -1,
+    accessToken: mapboxToken
+  });
+
+  
+
+  // Create the base map
+  const map = L.map('map', {
+    center: [51.1657, 10.4515],
+    zoom: 4,
+    layers: [colors, grayscale]
+  });
+
+  // Get color depending on value
+	function getColor(d) {
+		return d >= 0 ? '#A1D76A' :
+				d < 0   ? '#E9A3C9' :
+							'#F7F7F7';
+	}
+  // Get style depending on feature (calls getColor)
+	function style(feature) {
+		return {
+			weight: 2,
+			opacity: 0.5,
+			color: 'white',
+			dashArray: '3',
+			fillOpacity: 0.8,
+			fillColor: getColor(feature.properties.BC_balance)
+		};
+	}
+  // Highlight hovered over features with a style
+	function highlightFeature(e) {
+		var layer = e.target;
+
+		layer.setStyle({
+			weight: 5,
+			color: '#666',
+			dashArray: '',
+			fillOpacity: 0.8
+		});
+
+    // Only pop layer if not on IE, Opera or Edge, since they are buggy
+		if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+			layer.bringToFront();
+		}
+    // Not sure of its purpose
+		info.update(layer.feature.properties)
+	};
+  // Define geojson var, not sure exactly why it needs to be instantiated already
+	var geojson;
+
+	function resetHighlight(e) {
+		geojson.resetStyle(e.target);
+		info.update();
+	}
+  // Zoom to feature
+	function zoomToFeature(e) {
+		map.fitBounds(e.target.getBounds(), {padding: [0, 0]})
+	};
+  // The function  that ties together the cursor dependent behavior
+	function onEachFeature(feature, layer) {
+		layer.on({
+			mouseover: highlightFeature,
+			mouseout: resetHighlight,
+			click: zoomToFeature
+		});
+	}
+
+  // Add geojson to map
+  geojson = new L.GeoJSON.AJAX('national_bc_balance.geojson', {
+    style: style,
+    onEachFeature: onEachFeature});
+  geojson.addTo(map);
+
+
+  // Create empty layerGroup to store markers
+  var markerGroup = L.layerGroup();
+
+  /*creating source and destination Proj4js objects.
+    Once initialized, these may be re-used as often as needed */
+  const fromProj = proj4('EPSG:3035'); //source coordinates in N/E meters, ETRS89-extended
+  const toProj = proj4('EPSG:4326'); //destination coordinates will be in lat-long, WGS84
+
+  $.get('./UBC_proc.csv', function (csvString) {
+
+    // Use PapaParse to convert string to array of objects
+    let data = Papa.parse(csvString, {
+      header: true,
+      dynamicTyping: true
+    }).data;
+
+    // For each row in data, create a marker and add it to the map
+    // For each row, columns `Latitude`, `Longitude`, and `Title` are required
+    for (var i in data) {
+      let row = data[i];
+
+      // transform point coordinates
+      let p = [Math.round(row.long), Math.round(row.lat)]; //any object will do as long as it has 'x' and 'y' properties
+      console.log(p); // WHERE DOES THIS OUTPUT???
+      let testp = proj4(fromProj, toProj, p); //do the transformation
+
+      let marker = L.marker([testp[1], testp[0]], {
+        icon: recycleIcon,
+        opacity: 1
+      }).bindPopup(row.name)
+
+      markerGroup.addLayer(marker)
+      // marker.addTo(map)
+    }
+  });
+
+  // Add markers to map
+  markerGroup.addTo(map);
+
+  // Set base maps for layer control
+  var baseMaps = {
+    "None": none,
+    "Grayscale": grayscale,
+    "Colors": colors
+  };
+
+  // Set overlay maps for layer control
+  var overlayMaps = {
+      "National BC balance": geojson,
+      "UBC Plants": markerGroup
+  };
+
+  // Add layer control to map
+  L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+
+  </script>
+
+  <!--------------------------------- Debugging/printing sandbox ------------->
+  <!-- <div id='debugger'>
+    <p id='print'></p>
+    <script type='text/javascript'>
+    /*
+      $.get('./UBC_proc.csv', function (csvString) {
+        // Use PapaParse to convert string to array of objects
+        let data = Papa.parse(csvString, {
+          header: true,
+          dynamicTyping: true
+        }).data;
+        let row = data[0];
+        document.getElementById('print').innerHTML = row.lat;
+      }) */
+    </script>
+  </div> -->
+</body>
+
+</html>
