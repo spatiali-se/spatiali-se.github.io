@@ -150,7 +150,7 @@
 
   // Get color depending on value
 	function getColor(d) {
-		return d >= 0 ? '#A1D76A' :
+		return d > 0 ? '#A1D76A' :
 				d < 0   ? '#E9A3C9' :
 							'#F7F7F7';
 	}
@@ -162,7 +162,7 @@
 			color: 'white',
 			dashArray: '3',
 			fillOpacity: 0.8,
-			fillColor: getColor(feature.properties.BC_balance)
+			fillColor: getColor(feature.properties.bc_balance)
 		};
 	}
   // Highlight hovered over features with a style
@@ -204,7 +204,7 @@
 	}
 
   // Add geojson to map
-  geojson = new L.GeoJSON.AJAX('national_bc_balance.geojson', {
+  geojson = new L.GeoJSON.AJAX('europe.geojson', {
     style: style,
     onEachFeature: onEachFeature});
   geojson.addTo(map);
@@ -232,7 +232,7 @@
       let row = data[i];
 
       // transform point coordinates
-      let p = [Math.round(row.long), Math.round(row.lat)]; //any object will do as long as it has 'x' and 'y' properties
+      let p = [row.long, row.lat]; //any object will do as long as it has 'x' and 'y' properties
       console.log(p); // WHERE DOES THIS OUTPUT???
       let testp = proj4(fromProj, toProj, p); //do the transformation
 
